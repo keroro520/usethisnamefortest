@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# # Example
+#
+# ```
+# ./nostr postgres
+#
+# ./nostr start_relay --config config.json
+# ```
+#
+# ```
+# ./nostr noscl_example
+# ```
+
+export POSTGRES_PASSWORD=nostrdb
+export POSTGRES_USER=nostrdb
+export POSTGRES_DB=nostrdb
+
+GNOST_RELAY_BIN=/Users/keroro520/nodereal/nostr/gnost-relay/gnost-relay
+GNOST_RELAY_CONFIG=/Users/keroro520/nodereal/nostr/gnost-relay/config.json
+
+# Start PostgreSQL server
+postgres() {
+    docker run \
+        --name gnost-relay-postgres -d \
+        -p "5432:5432" \
+        -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+        -e POSTGRES_USER=$POSTGRES_USER \
+        -e POSTGRES_DB=$POSTGRES_DB \
+        postgres
+}
+
+# Connect PostgreSQL server via psql
+psql() {
+    docker exec -it \
+        -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+        -e POSTGRES_USER=$POSTGRES_USER \
+        -e POSTGRES_DB=$POSTGRES_DB \
+        gnost-relay-postgres psql -U $POSTGRES_USER $@
+}
+
+# Start gnost_relay server, listening http://localhost:8080
+#
+# # Usage
+#
+# ```
+# noscl relay add http://localhost:8080
+# ```
+start_relay() {
+    DATABASE_URL=postgres://$POSTGRES_DB:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB $GNOST_RELAY_BIN -config $GNOST_RELAY_CONFIG
+}
+
+noscl_example() {
+    noscl relay add http://localhost:8080
+
+    content="noscl example $(date)"
+    echo "Publishing \"$content\""
+    noscl publish "$content"
+
+    echo
+    echo
+    echo
+    echo "Subscribing..."
+
+    noscl profile $(noscl public)
+}
+
+main() {
+    if [ "$#" = "0" ]; then
+        echo "ERROR: subcommand is required"
+        exit 1
+    fi
+
+    command="$1"
+    shift 1
+
+    case $command in
+        "postgres")
+            postgres "$@"
+            ;;
+        "psql")
+            psql "$@"
+            ;;
+        "gnost_relay"|"start_gnost_relay"|"start_relay"|"startrelay")
+            start_relay "$@"
+            ;;
+        "noscl_example"|"example"|"test")
+            noscl_example "$@"
+            ;;
+        *)
+            echo "ERROR: unknown subcommand \"$command\""
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"
